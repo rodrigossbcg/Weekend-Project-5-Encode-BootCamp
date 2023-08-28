@@ -1,3 +1,4 @@
+
 import { Component, effect } from '@angular/core';
 import { MetamaskService } from './services/metamask.service';
 import { AlchemyService } from './services/alchemy.service';
@@ -19,7 +20,6 @@ declare global {
   styleUrls: ['./app.component.css'],
 })
 export class AppComponent {
-
   provider = new ethers.providers.Web3Provider(window.ethereum, "any");  /// ver na nova versão
   signer = this.provider.getSigner();
   title = 'Weekend Project 5 - Encode';
@@ -30,9 +30,9 @@ export class AppComponent {
   tokenBalances: TokenBalance[] = [];
   message = new FormControl('', Validators.required);
   signatures: string[] = [];
-  contract = Lottery__factory.connect("0x4cDe64bF06fC14C1B86e8972ec47c520b868102f", this.signer);
-  token = LotteryToken__factory.connect("0x4D70bE1ba2758FA287AEe20Ac5A7857c1aFEF8AD", this.signer);
-  tokenBalance = BigNumber.from(10);
+  contract = Lottery__factory.connect("0x214c7E4356d3970E5F4DaA0C5C42a162836e9b6d", this.signer);
+  token = LotteryToken__factory.connect("0x34f5a36E6d2d33546A327D81e7a0Ba12F2b491b1", this.signer);
+  tokenBalance = BigNumber.from(0);
 
   contractName = ""
   owner = ""
@@ -40,9 +40,10 @@ export class AppComponent {
   betFee = BigNumber.from(0)
   prizePool = BigNumber.from(0)
   betsOpen = false;
-  numBetsMade = Number(0)
   countdown = 'Bets are closed'
   targetTimestamp = BigNumber.from(0)
+
+  spendAllowedLeft = BigNumber.from(0);
 
   constructor(
     private metamaskService: MetamaskService,
@@ -75,7 +76,9 @@ export class AppComponent {
     effect(async () => {
       this.betsOpen = await this.contract.betsOpen();
     });
-
+    effect(async () => {
+      this.spendAllowedLeft = await this.token.allowance(this.currentAccount(), this.token.address);
+    });
   }
 
   ngOnInit() {
@@ -166,18 +169,43 @@ export class AppComponent {
       return "Error"
     }
   }
+  async aproove(spendAmount: number) {
+    try {
+      const tx = await this.token.approve(this.token.address, spendAmount);
+      await tx.wait();
+
+      // update spendAllowedLeft
+      this.spendAllowedLeft = await this.token.allowance(this.currentAccount(), this.token.address);
+      return tx.hash;
+    }
+    catch (error) {
+      alert("Error occured during the transaction!")
+      return "Error"
+    }
+  }
 
   // bet many
   async bet(nBets: string) {
     try {
-      const nBets1 = parseFloat(nBets);
-      const tx = await this.contract.betMany(nBets1);
-      await tx.wait();
-      this.numBetsMade += nBets1;
-      return tx.hash;
+      const nBets1 = parseInt(nBets);
+      const spendAmount = nBets1 * (Number(this.betPrice) + Number(this.betFee));
+      console.log(spendAmount);
+      let allowed = ''; 
+      if (spendAmount > Number(this.spendAllowedLeft)) {
+        allowed = await this.aproove(spendAmount);
+      }
+      if (allowed != "Error") {
+        // needs gaslimit due to loop 
+        const cost = 50000 * nBets1; 
+        const tx = await this.contract.betMany(nBets1, { gasLimit: cost });
+        return tx.hash;
+      }
+      return 'Error';
     }
 
-    catch{
+    catch (error) {
+      alert(error);
+      console.log(error);
       alert("Error occured during the transaction!")
       return "Error"
     }

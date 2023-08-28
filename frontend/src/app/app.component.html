@@ -122,6 +122,13 @@
                 <br>
                 <input class="w-full p-4" #inputRef2 placeholder="Number of Bets...">
                 <br>
+                <div *ngIf="+spendAllowedLeft < (+inputRef2.value * (+betPrice + +betFee)) && +inputRef2.value > 0">
+                  <p class="text-1xl text-center mt-8 opacity-40 text-sm">
+                    Please approve a minimum of <b>{{ (+inputRef2.value * (+betPrice + +betFee)) - +spendAllowedLeft }}</b>
+                    tokens for that bet to work.
+                  </p>
+                </div>
+                <br>
                 <button class="bg-red-700 hover:bg-red-700 text-white font-bold py-2 p-8 px-6 rounded w-full" (click)="bet(inputRef2.value)">Bet</button>
               </div>
 
@@ -155,4 +162,3 @@
     </div>
   </div>
 </div>
-  
